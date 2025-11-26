@@ -16,7 +16,6 @@
     "libfontconfig1",
     "libgbm1",
     "libglib2.0-0",
-    "libgdk-pixbuf-2.0-0",
     "libgtk-3-0",
     "libnspr4",
     "libnss3",
@@ -35,5 +34,6 @@
     "libxrender1",
     "libxss1",
     "libxtst6",
-    "xdg-utils"
+    "xdg-utils",
+    "libgobject-2.0-0"   # <-- add this line
   ]
