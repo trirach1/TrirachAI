@@ -35,5 +35,6 @@
     "libxss1",
     "libxtst6",
     "xdg-utils",
+    "chromium-browser",
     "libgobject-2.0-0"   # <-- add this line
   ]
