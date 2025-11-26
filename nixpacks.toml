@@ -19,5 +19,5 @@
     'libxss1',
     'libxtst6',
     'xdg-utils',
-    'libglib2.0-0'   # <-- add this line
+    'libglib2.0-0'   # provides libgobject-2.0.so.0
   ]
