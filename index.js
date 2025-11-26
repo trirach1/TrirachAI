@@ -1,74 +1,77 @@
-import express from "express";
-import cors from "cors";
-import qrcode from "qrcode-terminal";
-import { Client, RemoteAuth } from "whatsapp-web.js";
-import { MongoStore } from "wwebjs-mongo";
-import mongoose from "mongoose";
+const express = require("express");
+const cors = require("cors");
+const qrcode = require("qrcode-terminal");
+const { Client, LocalAuth } = require("whatsapp-web.js");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// -------------------------------------
-// 1. CONNECT TO MONGO (for saving session)
-// -------------------------------------
-const mongoURL = "mongodb://127.0.0.1:27017/whatsapp-sessions"; 
-mongoose.connect(mongoURL).then(() => console.log("MongoDB connected"));
+let client;
 
-// -------------------------------------
-// 2. Setup RemoteAuth (no puppeteer, no chrome)
-// -------------------------------------
-const store = new MongoStore({ mongoose: mongoose });
+async function startWhatsApp() {
+  client = new Client({
+    puppeteer: {
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage"
+      ],
+      executablePath: "/usr/bin/chromium-browser"
+    },
+    authStrategy: new LocalAuth({ clientId: "session" }),
+  });
 
-const client = new Client({
-  authStrategy: new RemoteAuth({
-    store,
-    backupSyncIntervalMs: 300000,
-  }),
-  puppeteer: {
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  },
-});
+  client.on("qr", (qr) => {
+    console.log("Scan this QR code to login:");
+    qrcode.generate(qr, { small: true });
+  });
 
-// -------------------------------------
-// 3. QR Code
-// -------------------------------------
-client.on("qr", (qr) => {
-  console.log("\n📌 SCAN QR CODE:");
-  qrcode.generate(qr, { small: true });
-});
+  client.on("ready", () => {
+    console.log("WhatsApp is ready!");
+  });
 
-// -------------------------------------
-// 4. Client Ready
-// -------------------------------------
-client.on("ready", () => {
-  console.log("✅ WhatsApp Client is ready!");
-});
+  client.on("authenticated", () => {
+    console.log("Authenticated!");
+  });
 
-// -------------------------------------
-// 5. Send Message API
-// -------------------------------------
+  client.on("auth_failure", () => {
+    console.log("Auth failed!");
+  });
+
+  client.on("message", async (msg) => {
+    console.log("Message received:", msg.body);
+
+    if (msg.body === "!ping") {
+      msg.reply("pong!");
+    }
+  });
+
+  client.initialize();
+}
+
+startWhatsApp();
+
+// API to send messages
 app.post("/send", async (req, res) => {
   const { number, message } = req.body;
 
+  if (!client) return res.status(500).json({ success: false, message: "Client not ready" });
+
   try {
-    const chatId = number.includes("@c.us") ? number : number + "@c.us";
-    await client.sendMessage(chatId, message);
-    res.json({ success: true, msg: "Message sent!" });
-  } catch (err) {
-    res.json({ success: false, error: err.message });
+    const formattedNumber = number.includes("@c.us")
+      ? number
+      : number + "@c.us";
+
+    await client.sendMessage(formattedNumber, message);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.toString() });
   }
 });
 
-app.get("/", (req, res) => {
-  res.send("WhatsApp API is running");
+app.listen(3000, () => {
+  console.log("WhatsApp Web Service running on port 3000");
 });
-
-// -------------------------------------
-client.initialize();
-// -------------------------------------
-
-// -------------------------------------
-app.listen(3000, () => console.log("🚀 Server started on port 3000"));
-// -------------------------------------
